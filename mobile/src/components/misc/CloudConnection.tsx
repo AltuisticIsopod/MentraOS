@@ -19,7 +19,8 @@ export default function CloudConnection() {
   // Add delay logic for disconnection alerts
   const [delayedStatus, setDelayedStatus] = useState<WebSocketStatus>(connectionStatus)
   const disconnectionTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const DISCONNECTION_DELAY = 3000 // 3 seconds delay
+  const leftConnectedAtRef = useRef<number | null>(null)
+  const DISCONNECTION_DELAY = 5000 // 5 seconds delay
 
   /**
    * Return gradient colors based on the cloud connection status
@@ -82,25 +83,38 @@ export default function CloudConnection() {
       disconnectionTimerRef.current = null
     }
 
-    if (connectionStatus === WebSocketStatus.DISCONNECTED || connectionStatus === WebSocketStatus.ERROR) {
-      // Don't update delayedStatus immediately for DISCONNECTED/ERROR - keep previous status
-      // Start timer to show disconnection after delay
-      disconnectionTimerRef.current = setTimeout(() => {
-        // Only show if still disconnected/error when timer fires
-        if (connectionStatus === WebSocketStatus.DISCONNECTED || connectionStatus === WebSocketStatus.ERROR) {
-          setDelayedStatus(connectionStatus)
-          cloudConnectionStatusAnim.value = withTiming(1, {duration: 500})
-          setTimeout(() => {
-            setHideCloudConnection(false)
-          }, 500)
-        }
-      }, DISCONNECTION_DELAY)
-    } else {
-      // For connected/connecting states, update immediately and hide badge if connected
+    if (connectionStatus === WebSocketStatus.CONNECTED) {
+      leftConnectedAtRef.current = null
       setDelayedStatus(connectionStatus)
-      setHideCloudConnection(connectionStatus === WebSocketStatus.CONNECTED)
-      cloudConnectionStatusAnim.value =
-        connectionStatus === WebSocketStatus.CONNECTED ? withTiming(0, {duration: 500}) : withTiming(1, {duration: 500})
+      setHideCloudConnection(true)
+      cloudConnectionStatusAnim.value = withTiming(0, {duration: 500})
+    } else {
+      //  check if we just left CONNECTED state
+      if (leftConnectedAtRef.current === null) {
+        // Just left CONNECTED state - record the timestamp
+        leftConnectedAtRef.current = Date.now()
+      }
+      // Calculating time since we've been out of CONNECTED state
+      const timeSinceLeftConnected = Date.now() - (leftConnectedAtRef.current || 0)
+
+      if (timeSinceLeftConnected >= DISCONNECTION_DELAY) {
+        // out of CONNECTED for >5 seconds - show the status
+        setDelayedStatus(connectionStatus)
+        setHideCloudConnection(false)
+        cloudConnectionStatusAnim.value = withTiming(1, {duration: 500})
+      } else {
+        // We've been out of CONNECTED for <5 seconds - wait before showing
+        const remainingDelay = DISCONNECTION_DELAY - timeSinceLeftConnected
+        disconnectionTimerRef.current = setTimeout(() => {
+          // Only show if still not connected when timer fires
+          const currentStatus = useConnectionStore.getState().status
+          if (currentStatus !== WebSocketStatus.CONNECTED) {
+            setDelayedStatus(currentStatus)
+            setHideCloudConnection(false)
+            cloudConnectionStatusAnim.value = withTiming(1, {duration: 500})
+          }
+        }, remainingDelay)
+      }
     }
 
     // Cleanup function
