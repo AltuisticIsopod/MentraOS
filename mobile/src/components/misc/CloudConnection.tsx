@@ -1,15 +1,16 @@
 import {useEffect, useRef, useState} from "react"
 import {View, ViewStyle, TextStyle} from "react-native"
 import LinearGradient from "react-native-linear-gradient"
-import Icon from "react-native-vector-icons/FontAwesome"
 import Animated, {useSharedValue, withTiming} from "react-native-reanimated"
-import {useConnectionStore} from "@/stores/connection"
-import {WebSocketStatus} from "@/services/WebSocketManager"
-import {useAppTheme} from "@/utils/useAppTheme"
-import {ThemedStyle} from "@/theme"
+import Icon from "react-native-vector-icons/FontAwesome"
+
 import {Text} from "@/components/ignite"
 import {translate} from "@/i18n"
+import {WebSocketStatus} from "@/services/WebSocketManager"
 import {useRefreshApplets} from "@/stores/applets"
+import {useConnectionStore} from "@/stores/connection"
+import {ThemedStyle} from "@/theme"
+import {useAppTheme} from "@/utils/useAppTheme"
 
 export default function CloudConnection() {
   const connectionStatus = useConnectionStore(state => state.status)
@@ -79,44 +80,44 @@ export default function CloudConnection() {
   useEffect(() => {
     console.log("CloudConnection: Status:", connectionStatus)
 
+    if (disconnectionTimerRef.current) {
+      clearTimeout(disconnectionTimerRef.current)
+      disconnectionTimerRef.current = null
+    }
+
     if (connectionStatus === WebSocketStatus.CONNECTED) {
-      // Reset disconnection tracking
       firstDisconnectedTimeRef.current = null
-
-      // Clear any pending timer
-      if (disconnectionTimerRef.current) {
-        clearTimeout(disconnectionTimerRef.current)
-        disconnectionTimerRef.current = null
-      }
-
-      // Hide the banner immediately
       setDelayedStatus(connectionStatus)
       setHideCloudConnection(true)
       cloudConnectionStatusAnim.value = withTiming(0, {duration: 500})
     } else {
-      // Not connected (DISCONNECTED, CONNECTING, or ERROR)
-
-      // Track when we first left the connected state
+      //  check if we just left CONNECTED state
       if (firstDisconnectedTimeRef.current === null) {
+        // Just left CONNECTED state - record the timestamp
         firstDisconnectedTimeRef.current = Date.now()
+      }
+      // Calculating time since we've been out of CONNECTED state
+      const timeSinceLeftConnected = Date.now() - (firstDisconnectedTimeRef.current || 0)
 
-        // Start timer to show banner after delay
-        disconnectionTimerRef.current = setTimeout(() => {
-          setDelayedStatus(connectionStatus)
-          cloudConnectionStatusAnim.value = withTiming(1, {duration: 500})
-          setTimeout(() => {
-            setHideCloudConnection(false)
-          }, 500)
-        }, DISCONNECTION_DELAY)
+      if (timeSinceLeftConnected >= DISCONNECTION_DELAY) {
+        // out of CONNECTED for >5 seconds - show the status
+        setDelayedStatus(connectionStatus)
+        setHideCloudConnection(false)
+        cloudConnectionStatusAnim.value = withTiming(1, {duration: 500})
       } else {
-        // We're still disconnected but status changed (e.g., DISCONNECTED -> CONNECTING)
-        // Update the displayed status only if the banner is already visible
-        if (!hideCloudConnection) {
-          setDelayedStatus(connectionStatus)
-        }
+        // We've been out of CONNECTED for <5 seconds - wait before showing
+        const remainingDelay = DISCONNECTION_DELAY - timeSinceLeftConnected
+        disconnectionTimerRef.current = setTimeout(() => {
+          // Only show if still not connected when timer fires
+          const currentStatus = useConnectionStore.getState().status
+          if (currentStatus !== WebSocketStatus.CONNECTED) {
+            setDelayedStatus(currentStatus)
+            setHideCloudConnection(false)
+            cloudConnectionStatusAnim.value = withTiming(1, {duration: 500})
+          }
+        }, remainingDelay)
       }
     }
-
     if (connectionStatus === WebSocketStatus.CONNECTED || connectionStatus === WebSocketStatus.DISCONNECTED) {
       refreshApplets()
     }
