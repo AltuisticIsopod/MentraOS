@@ -1244,6 +1244,7 @@ class CoreManager {
         sgc?.disconnect()
         sgc = null // Clear the SGC reference after disconnect
         isSearching = false
+        handle_microphone_state_change(emptyList(), false)
         handle_request_status()
     }
 
@@ -1263,6 +1264,7 @@ class CoreManager {
         Bridge.saveSetting("default_wearable", "")
         Bridge.saveSetting("device_name", "")
         isSearching = false
+        handle_microphone_state_change(emptyList(), false)
         handle_request_status()
     }
 

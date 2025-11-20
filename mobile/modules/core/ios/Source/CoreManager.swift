@@ -1276,6 +1276,7 @@ struct ViewState {
         sgc?.disconnect()
         sgc = nil // Clear the SGC reference after disconnect
         isSearching = false
+        handle_microphone_state_change([], false)
         handle_request_status()
     }
 
@@ -1295,6 +1296,7 @@ struct ViewState {
         Bridge.saveSetting("default_wearable", "")
         Bridge.saveSetting("device_name", "")
         isSearching = false
+        handle_microphone_state_change([], false)
         handle_request_status()
     }
 
