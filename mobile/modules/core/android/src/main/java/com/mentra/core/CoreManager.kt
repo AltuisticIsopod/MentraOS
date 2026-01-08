@@ -1133,6 +1133,7 @@ class CoreManager {
             mutableRequiredData.add(SpeechRequiredDataType.TRANSCRIPTION)
         }
 
+
         when {
             mutableRequiredData.contains(SpeechRequiredDataType.PCM) &&
                     mutableRequiredData.contains(SpeechRequiredDataType.TRANSCRIPTION) -> {
